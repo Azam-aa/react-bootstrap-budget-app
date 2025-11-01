@@ -1,155 +1,165 @@
-import React, { useState, useEffect } from 'react';
-import ProjectModal from './components/ProjectModal';
-import PurchaseModal from './components/PurchaseModal';
-import Button from './components/Button';
-import DarkModeToggle from './components/DarkModeToggle';
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
+import React, { useState } from "react";
+import "bootstrap/dist/css/bootstrap.min.css";
+import jsPDF from "jspdf";
+import "jspdf-autotable";
 
-export default function App() {
-  const [projects, setProjects] = useState([]);
-  const [purchases, setPurchases] = useState({});
-  const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
-  const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
-  const [editingProject, setEditingProject] = useState(null);
-  const [currentProject, setCurrentProject] = useState(null);
+function App() {
+  const [purchases, setPurchases] = useState([]);
+  const [darkMode, setDarkMode] = useState(false);
+  const [form, setForm] = useState({ item: "", amount: "", category: "" });
+  const [editIndex, setEditIndex] = useState(null);
 
-  // Load from localStorage
-  useEffect(() => {
-    const savedProjects = JSON.parse(localStorage.getItem('projects')) || [];
-    const savedPurchases = JSON.parse(localStorage.getItem('purchases')) || {};
-    setProjects(savedProjects);
-    setPurchases(savedPurchases);
-  }, []);
+  const handleChange = (e) => {
+    setForm({ ...form, [e.target.name]: e.target.value });
+  };
 
-  // Save to localStorage
-  useEffect(() => {
-    localStorage.setItem('projects', JSON.stringify(projects));
-    localStorage.setItem('purchases', JSON.stringify(purchases));
-  }, [projects, purchases]);
-
-  const handleAddProject = (data) => {
-    if (editingProject) {
-      setProjects(projects.map(p => p.id === editingProject.id ? { ...p, ...data } : p));
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (editIndex !== null) {
+      const updated = [...purchases];
+      updated[editIndex] = form;
+      setPurchases(updated);
+      setEditIndex(null);
     } else {
-      setProjects([...projects, { id: Date.now(), ...data }]);
+      setPurchases([...purchases, form]);
     }
-    setIsProjectModalOpen(false);
-    setEditingProject(null);
+    setForm({ item: "", amount: "", category: "" });
   };
 
-  const handleDeleteProject = (id) => {
-    const newProjects = projects.filter(p => p.id !== id);
-    const newPurchases = { ...purchases };
-    delete newPurchases[id];
-    setProjects(newProjects);
-    setPurchases(newPurchases);
+  const handleEdit = (index) => {
+    setForm(purchases[index]);
+    setEditIndex(index);
   };
 
-  const handleAddPurchase = (data) => {
-    const id = currentProject.id;
-    const newPurchase = { id: Date.now(), ...data };
-    const updated = {
-      ...purchases,
-      [id]: [...(purchases[id] || []), newPurchase],
-    };
-    setPurchases(updated);
-    setIsPurchaseModalOpen(false);
+  const handleDelete = (index) => {
+    setPurchases(purchases.filter((_, i) => i !== index));
   };
 
-  const formatCurrency = (value) =>
-    new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(value || 0);
+  const totalSpent = purchases.reduce(
+    (acc, p) => acc + Number(p.amount || 0),
+    0
+  );
 
-  // 🧾 PDF Export Function
-  const handleExportPDF = async (project) => {
-    const input = document.getElementById(`project-${project.id}`);
-    const canvas = await html2canvas(input);
-    const imgData = canvas.toDataURL('image/png');
-    const pdf = new jsPDF('p', 'mm', 'a4');
-    const imgProps = pdf.getImageProperties(imgData);
-    const pdfWidth = pdf.internal.pageSize.getWidth();
-    const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-    pdf.save(`${project.name}_Report.pdf`);
+  const generatePDF = () => {
+    const doc = new jsPDF();
+    doc.text("💰 Budget Tracker Report", 14, 15);
+    doc.autoTable({
+      head: [["Item", "Category", "Amount"]],
+      body: purchases.map((p) => [p.item, p.category, p.amount]),
+      startY: 25,
+    });
+    doc.text(`Total Spent: ₹${totalSpent}`, 14, doc.autoTable.previous.finalY + 10);
+    doc.save("Budget_Report.pdf");
   };
 
   return (
-    <div className="container py-4">
-      <div className="d-flex justify-content-between align-items-center mb-4">
-        <h2><b>MD ALUMINIUM</b></h2>
-        <div className="d-flex gap-2">
-          <DarkModeToggle />
-          <Button onClick={() => setIsProjectModalOpen(true)}>+ New Project</Button>
+    <div
+      className={`min-vh-100 ${
+        darkMode ? "bg-dark text-light" : "bg-light text-dark"
+      }`}
+    >
+      <div className="container py-5">
+        <div className="d-flex justify-content-between align-items-center mb-4">
+          <h1>💸 Budget Tracker</h1>
+          <button
+            className="btn btn-outline-secondary"
+            onClick={() => setDarkMode(!darkMode)}
+          >
+            {darkMode ? "☀️ Light Mode" : "🌙 Dark Mode"}
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="mb-4">
+          <div className="row g-3">
+            <div className="col-md-4">
+              <input
+                type="text"
+                name="item"
+                placeholder="Item"
+                value={form.item}
+                onChange={handleChange}
+                required
+                className="form-control"
+              />
+            </div>
+            <div className="col-md-4">
+              <input
+                type="number"
+                name="amount"
+                placeholder="Amount"
+                value={form.amount}
+                onChange={handleChange}
+                required
+                className="form-control"
+              />
+            </div>
+            <div className="col-md-3">
+              <input
+                type="text"
+                name="category"
+                placeholder="Category"
+                value={form.category}
+                onChange={handleChange}
+                required
+                className="form-control"
+              />
+            </div>
+            <div className="col-md-1">
+              <button type="submit" className="btn btn-primary w-100">
+                {editIndex !== null ? "Update" : "Add"}
+              </button>
+            </div>
+          </div>
+        </form>
+
+        <h4>🧾 Purchase List</h4>
+        {purchases.length === 0 ? (
+          <p className="text-muted">No purchases added yet.</p>
+        ) : (
+          <table className="table table-bordered table-striped mt-3">
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>Category</th>
+                <th>Amount</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {purchases.map((p, i) => (
+                <tr key={i}>
+                  <td>{p.item}</td>
+                  <td>{p.category}</td>
+                  <td>₹{p.amount}</td>
+                  <td>
+                    <button
+                      className="btn btn-warning btn-sm me-2"
+                      onClick={() => handleEdit(i)}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      className="btn btn-danger btn-sm"
+                      onClick={() => handleDelete(i)}
+                    >
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+
+        <div className="d-flex justify-content-between align-items-center mt-4">
+          <h5>Total Spent: ₹{totalSpent}</h5>
+          <button className="btn btn-success" onClick={generatePDF}>
+            📄 Download PDF
+          </button>
         </div>
       </div>
-
-      {projects.length === 0 ? (
-        <div className="alert alert-info text-center">No projects yet. Add one!</div>
-      ) : (
-        <div className="row">
-          {projects.map(project => {
-            const spent = (purchases[project.id] || []).reduce((a, b) => a + Number(b.amount || 0), 0);
-            const remaining = project.budget - spent;
-            return (
-              <div key={project.id} className="col-md-6 mb-4">
-                <div id={`project-${project.id}`} className="card shadow-sm p-3">
-                  <div className="card-body">
-                    <h5>{project.name}</h5>
-                    <p>{project.description}</p>
-                    <p><strong>Budget:</strong> {formatCurrency(project.budget)}</p>
-                    <p><strong>Spent:</strong> {formatCurrency(spent)}</p>
-                    <p><strong>Remaining:</strong> {formatCurrency(remaining)}</p>
-
-                    <div className="d-flex gap-2 mb-2">
-                      <Button variant="success" onClick={() => { setCurrentProject(project); setIsPurchaseModalOpen(true); }}>Add Purchase</Button>
-                      <Button variant="secondary" onClick={() => { setEditingProject(project); setIsProjectModalOpen(true); }}>Edit</Button>
-                      <Button variant="danger" onClick={() => handleDeleteProject(project.id)}>Delete</Button>
-                    </div>
-
-                    <Button variant="info" className="mt-1" onClick={() => handleExportPDF(project)}>
-                      🧾 Download PDF
-                    </Button>
-
-                    <hr />
-                    <h6>Purchases:</h6>
-                    {(purchases[project.id] || []).length === 0 ? (
-                      <p className="text-muted small">No purchases yet.</p>
-                    ) : (
-                      <ul className="list-group small">
-                        {(purchases[project.id] || []).map(p => (
-                          <li key={p.id} className="list-group-item d-flex justify-content-between">
-                            <span>{p.description}</span>
-                            <span>{formatCurrency(p.amount)}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {isProjectModalOpen && (
-        <ProjectModal
-          isOpen={isProjectModalOpen}
-          onClose={() => setIsProjectModalOpen(false)}
-          onSave={handleAddProject}
-          project={editingProject}
-        />
-      )}
-
-      {isPurchaseModalOpen && (
-        <PurchaseModal
-          isOpen={isPurchaseModalOpen}
-          onClose={() => setIsPurchaseModalOpen(false)}
-          onSave={handleAddPurchase}
-        />
-      )}
-
-      <footer className="mt-5">Owner: Mateen</footer>
     </div>
   );
 }
+
+export default App;
