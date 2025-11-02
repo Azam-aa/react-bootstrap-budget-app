@@ -7,7 +7,6 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import 'bootstrap/dist/css/bootstrap.min.css';
 
-
 export default function App() {
   const [projects, setProjects] = useState([]);
   const [purchases, setPurchases] = useState({});
@@ -57,6 +56,22 @@ export default function App() {
     };
     setPurchases(updated);
     setIsPurchaseModalOpen(false);
+  };
+
+  // ✏️ Edit Purchase
+  const handleEditPurchase = (projectId, purchaseId, updatedData) => {
+    const updatedPurchases = { ...purchases };
+    updatedPurchases[projectId] = updatedPurchases[projectId].map(p =>
+      p.id === purchaseId ? { ...p, ...updatedData } : p
+    );
+    setPurchases(updatedPurchases);
+  };
+
+  // 🗑️ Delete Purchase
+  const handleDeletePurchase = (projectId, purchaseId) => {
+    const updatedPurchases = { ...purchases };
+    updatedPurchases[projectId] = updatedPurchases[projectId].filter(p => p.id !== purchaseId);
+    setPurchases(updatedPurchases);
   };
 
   const formatCurrency = (value) =>
@@ -119,9 +134,33 @@ export default function App() {
                     ) : (
                       <ul className="list-group small">
                         {(purchases[project.id] || []).map(p => (
-                          <li key={p.id} className="list-group-item d-flex justify-content-between">
-                            <span>{p.description}</span>
-                            <span>{formatCurrency(p.amount)}</span>
+                          <li
+                            key={p.id}
+                            className="list-group-item d-flex justify-content-between align-items-center"
+                          >
+                            <div>
+                              <strong>{p.description || 'No description'}</strong>
+                              <br />
+                              {formatCurrency(p.amount)}
+                            </div>
+                            <div className="d-flex gap-2">
+                              <button
+                                className="btn btn-sm btn-outline-secondary"
+                                onClick={() => {
+                                  const newDesc = prompt("Edit description:", p.description);
+                                  const newAmt = parseFloat(prompt("Edit amount:", p.amount)) || p.amount;
+                                  handleEditPurchase(project.id, p.id, { description: newDesc, amount: newAmt });
+                                }}
+                              >
+                                ✏️
+                              </button>
+                              <button
+                                className="btn btn-sm btn-outline-danger"
+                                onClick={() => handleDeletePurchase(project.id, p.id)}
+                              >
+                                🗑️
+                              </button>
+                            </div>
                           </li>
                         ))}
                       </ul>
@@ -151,7 +190,7 @@ export default function App() {
         />
       )}
 
-      <footer className="mt-5">Owner: Mateen</footer>
+      <footer className="mt-5 text-center">Owner: Mateen</footer>
     </div>
   );
 }
